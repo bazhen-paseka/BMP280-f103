@@ -27,6 +27,11 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
+	#include <string.h>
+	#include <stdio.h>
+	#include "bmp280_sm.h"
+	#include "i2c_techmaker_sm.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -36,6 +41,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
+	/* Current pressure at sealevel in hPa taken from http://www.aviador.es/Weather/Meteogram/UKKK */
+	#define QNH 1012
 
 /* USER CODE END PD */
 
@@ -47,6 +55,9 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+
+double temp, press, alt;
+int8_t com_rslt;
 
 /* USER CODE END PV */
 
@@ -96,6 +107,28 @@ int main(void)
 	char DataChar[100];
 	sprintf(DataChar,"\r\n BMP280\r\nUART1 for debug started on speed 115200\r\n");
 	HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+
+	I2C_ScanBusFlow(&hi2c1, &huart1);
+
+	/* Start BMP280 and change settings */
+	sprintf(DataChar,"Connecting to BMP280... ");
+	HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+
+	bmp280_t bmp280;
+	bmp280.i2c_handle = &hi2c1;
+	bmp280.dev_addr = BMP280_I2C_ADDRESS1;
+	com_rslt = BMP280_init(&bmp280);
+	com_rslt += BMP280_set_power_mode(BMP280_NORMAL_MODE);
+	com_rslt += BMP280_set_work_mode(BMP280_STANDARD_RESOLUTION_MODE);
+	com_rslt += BMP280_set_standby_durn(BMP280_STANDBY_TIME_1_MS);
+	if (com_rslt != SUCCESS) {
+		sprintf(DataChar,"check BMP280 connection!\r\nProgram terminate\r\n");
+		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+		return 0;
+	}
+	sprintf(DataChar,"connection successful!\r\n");
+	HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -104,6 +137,25 @@ int main(void)
   {
 	  HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 	  HAL_Delay(1000);
+
+		/* Read temperature and pressure */
+		BMP280_read_temperature_double(&temp);
+		BMP280_read_pressure_double(&press);
+		/* Calculate current altitude, based on current QNH pressure */
+		alt = BMP280_calculate_altitude(QNH * 100);
+
+		//LCD_Printf("Temp : %6.2f C\n", temp);
+		sprintf(DataChar,"Temp: %2.2f C ", temp);
+		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+
+		//LCD_Printf("Press: %6.0f Pa\n", press);
+		sprintf(DataChar,"Press: %6.0f Pa ", press);
+		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+
+		//LCD_Printf("Alt  : %3.0f m", alt);
+		sprintf(DataChar,"Alt: %3.0f m\r\n", alt);
+		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
