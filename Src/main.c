@@ -55,14 +55,17 @@
 
 /* USER CODE BEGIN PV */
 
-double temp, press, alt;
-int8_t com_rslt;
+	char DataChar[100];
+	double temp, press, alt;
+	int8_t com_rslt;
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
+
+void Check_RDP_Level_1(void);
 
 /* USER CODE END PFP */
 
@@ -103,9 +106,11 @@ int main(void)
   MX_I2C1_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-	char DataChar[100];
-	sprintf(DataChar,"\r\n BMP280\r\nUART1 for debug started on speed 115200\r\n");
-	HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+
+	sprintf(DataChar,"\r\n\r\n\t BMP280-f103\r\n");HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+	sprintf(DataChar,"\t UART1 (PA9) for debug 115200\r\n");HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+
+    Check_RDP_Level_1();
 
 	I2C_ScanBusFlow(&hi2c1, &huart1);
 
@@ -202,6 +207,28 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+void Check_RDP_Level_1(void)
+{
+    FLASH_OBProgramInitTypeDef 			obInit;
+    HAL_FLASH_Unlock();					// Розблоковуємо FLASH
+    HAL_FLASH_OB_Unlock();				// Розблоковуємо Option Bytes
+    HAL_FLASHEx_OBGetConfig(&obInit);	// Читаємо поточні налаштування
+
+    if (obInit.RDPLevel == OB_RDP_LEVEL_1) {
+        HAL_FLASH_OB_Lock();
+        HAL_FLASH_Lock();
+    	sprintf(DataChar,"RDP.Ok \r\n"); HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+    } else {
+    	sprintf(DataChar,"RDP.not.set -> set.RDP_Level_1\r\n"); HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+		sprintf(DataChar,">>> Restart device! <<< \r\n"); HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+        obInit.OptionType = OPTIONBYTE_RDP;
+        obInit.RDPLevel = OB_RDP_LEVEL_1;
+		if (HAL_FLASHEx_OBProgram(&obInit) == HAL_OK) {
+			HAL_FLASH_OB_Launch();
+		}
+    }
+}
 
 /* USER CODE END 4 */
 
