@@ -17,7 +17,6 @@
   ******************************************************************************
   */
 /* USER CODE END Header */
-
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "i2c.h"
@@ -56,14 +55,17 @@
 
 /* USER CODE BEGIN PV */
 
-double temp, press, alt;
-int8_t com_rslt;
+	char DataChar[100];
+	double temp, press, alt;
+	int8_t com_rslt;
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
+
+void Check_RDP_Level_1(void);
 
 /* USER CODE END PFP */
 
@@ -78,10 +80,10 @@ void SystemClock_Config(void);
   */
 int main(void)
 {
+
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
-  
 
   /* MCU Configuration--------------------------------------------------------*/
 
@@ -104,9 +106,11 @@ int main(void)
   MX_I2C1_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-	char DataChar[100];
-	sprintf(DataChar,"\r\n BMP280\r\nUART1 for debug started on speed 115200\r\n");
-	HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+
+	sprintf(DataChar,"\r\n\r\n\t BMP280-f103\r\n");HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+	sprintf(DataChar,"\t UART1 (PA9) for debug 115200\r\n");HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+
+    Check_RDP_Level_1();
 
 	I2C_ScanBusFlow(&hi2c1, &huart1);
 
@@ -172,7 +176,8 @@ void SystemClock_Config(void)
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
-  /** Initializes the CPU, AHB and APB busses clocks 
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
@@ -185,7 +190,8 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  /** Initializes the CPU, AHB and APB busses clocks 
+
+  /** Initializes the CPU, AHB and APB buses clocks
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
@@ -201,6 +207,28 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+void Check_RDP_Level_1(void)
+{
+    FLASH_OBProgramInitTypeDef 			obInit;
+    HAL_FLASH_Unlock();					// Розблоковуємо FLASH
+    HAL_FLASH_OB_Unlock();				// Розблоковуємо Option Bytes
+    HAL_FLASHEx_OBGetConfig(&obInit);	// Читаємо поточні налаштування
+
+    if (obInit.RDPLevel == OB_RDP_LEVEL_1) {
+        HAL_FLASH_OB_Lock();
+        HAL_FLASH_Lock();
+    	sprintf(DataChar,"RDP.Ok \r\n"); HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+    } else {
+    	sprintf(DataChar,"RDP.not.set -> set.RDP_Level_1\r\n"); HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+		sprintf(DataChar,">>> Restart device! <<< \r\n"); HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+        obInit.OptionType = OPTIONBYTE_RDP;
+        obInit.RDPLevel = OB_RDP_LEVEL_1;
+		if (HAL_FLASHEx_OBProgram(&obInit) == HAL_OK) {
+			HAL_FLASH_OB_Launch();
+		}
+    }
+}
 
 /* USER CODE END 4 */
 
@@ -225,12 +253,10 @@ void Error_Handler(void)
   * @retval None
   */
 void assert_failed(uint8_t *file, uint32_t line)
-{ 
+{
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
      tex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
